@@ -26,7 +26,7 @@ def calculate_cluster_similarity(rho, K):
     ## TODO: make similarity metric an arg?
     return (
         torch.tensor(
-            [l1_loss(rho[:,i], rho[:,j], reduction='mean') if j > i else 0. 
+            [l1_loss(rho[i,:], rho[j,:], reduction='mean') if j > i else 0. 
             for i in range(K) for j in range(K)]
         )
         .view(K, K)
@@ -108,7 +108,7 @@ class SVA:
         self.rho = torch.tensor([1.])
         self.w = torch.tensor([1.])
 
-        self.sigma = torch.diag(torch.ones(2,))
+        self.sigma = torch.nn.Parameter(torch.diag(torch.ones(2,)), requires_grad=True)
         mu0 = torch.zeros((2,))
         self.base_dist = dist.MultivariateNormal(mu0, 10*torch.diag(torch.ones(2,)))
     
@@ -136,14 +136,14 @@ class SVA:
             self.w+= self.rho[:self.K]
         
         ## do the update
+        self.optimizer.zero_grad()
         loss = (
             self.rho.detach() * (
                 self.base_dist.log_prob(self.phi) + dist.MultivariateNormal(self.phi, self.sigma).log_prob(x)
             )
         ).mean()
-
-        grad_phi = torch.autograd.grad(loss, self.phi, retain_graph=True)[0] # manual gradient computation
-        self.phi = self.phi + self.learning_rate * grad_phi # apply gradient update
+        loss.backward()
+        self.optimizer.step()
         self.phi = self.phi.detach().requires_grad_(True) # prevent old graph accumulation
 
     ## TODO: create run function separate from this class
@@ -151,6 +151,7 @@ class SVA:
         ## TODO: create options for initialising first cluster
         ## initialise cluster with first datapoint
         self.phi = torch.nn.Parameter(data[0, ...].unsqueeze(0))
+        self.optimizer = torch.optim.Adam([self.phi], lr=self.learning_rate)
         # self.phi = torch.nn.Parameter(self.base_dist.sample().unsqueeze(0))
         logger.info("Initialising Phi: %s", self.phi.size())
 
@@ -167,12 +168,12 @@ class SVA:
                 
                 if self.phi.size(0) > 1:
                     ## TODO: log some info about which clusters are being merged.
-                    logger.info("Merging...")
-                    logger.info("%s", self.phi.size())
+                    logger.info("%d Clusters before merging...", self.K)
                     self.w, self.phi, self.K = merge_and_prune(
-                        data[:idx], self.w, self.phi, 
+                        data[((idx+1)-self.prune_and_merge_freq):idx], self.w, self.phi, 
                         self.rho, self.sigma, self.K,
-                        self.merge_cluster_distance_threshold)
+                        self.merge_cluster_distance_threshold
+                    )
                     logger.info("%d Clusters remain after merge", self.K)
 
             self.incremental_fit(x)
