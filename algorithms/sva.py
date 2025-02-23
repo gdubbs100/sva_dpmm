@@ -80,7 +80,7 @@ def merge_and_prune(data, w, phi, rho, sigma, K, similarity_threshold):
     rho_prime = calculate_rho(data, w, phi, sigma)
     cluster_similarity_matrix = calculate_cluster_similarity(rho_prime, K)
     clusters_to_merge = get_clusters_to_merge(cluster_similarity_matrix, similarity_threshold)
-    merge_statistics, all_to_prune = get_merge_statistics(clusters_to_merge, phi, rho, K)
+    merge_statistics, all_to_prune = get_merge_statistics(clusters_to_merge, phi, w, K)
     phi, w = apply_merge(merge_statistics, phi, w)
     w, phi, K = prune(all_to_prune, w, phi)
     return w, phi, K
@@ -91,6 +91,7 @@ class SVA:
         self,
         learning_rate: float,
         alpha: float,
+        gamma: float,
         new_cluster_threshold: float,
         prune_and_merge_freq: int,
         prune_cluster_threshold: float,
@@ -98,6 +99,7 @@ class SVA:
     ):
         self.learning_rate = learning_rate
         self.alpha = torch.tensor([alpha])
+        self.gamma = gamma
         self.new_cluster_threshold = new_cluster_threshold
 
         self.prune_and_merge_freq = prune_and_merge_freq
@@ -108,11 +110,11 @@ class SVA:
         self.rho = torch.tensor([1.])
         self.w = torch.tensor([1.])
 
-        self.sigma = torch.nn.Parameter(torch.diag(torch.ones(2,)), requires_grad=True)
+        self.sigma = torch.diag(torch.ones(2,))
         mu0 = torch.zeros((2,))
-        self.base_dist = dist.MultivariateNormal(mu0, 10*torch.diag(torch.ones(2,)))
+        self.base_dist = dist.MultivariateNormal(mu0, 100*torch.diag(torch.ones(2,)))
     
-    def incremental_fit(self, x):
+    def incremental_fit(self, x, idx):
         new_phi = torch.nn.Parameter(self.base_dist.sample())
         _phi = torch.vstack((self.phi, new_phi))
         _w = torch.concat((self.w, self.alpha))
@@ -128,7 +130,7 @@ class SVA:
 
             self.phi = torch.vstack((self.phi, new_phi))
             self.K += 1
-            logger.info("Added new cluster at: %s", new_phi)
+            logger.info("Added new cluster %d at: %s", self.K, new_phi)
 
         else:
 
@@ -136,14 +138,21 @@ class SVA:
             self.w+= self.rho[:self.K]
         
         ## do the update
-        self.optimizer.zero_grad()
+        # self.optimizer.zero_grad()
+        n = 100
+        d = np.min([n, (idx+1)**self.gamma])
         loss = (
-            self.rho.detach() * (
-                self.base_dist.log_prob(self.phi) + dist.MultivariateNormal(self.phi, self.sigma).log_prob(x)
+            self.base_dist.log_prob(self.phi) +
+            d * self.rho.detach() * (
+                dist.MultivariateNormal(self.phi, self.sigma).log_prob(x)
             )
         ).mean()
-        loss.backward()
-        self.optimizer.step()
+   
+
+        grad_phi = torch.autograd.grad(loss, self.phi,  retain_graph=True)[0]  # Compute gradient manually
+        self.phi = self.phi + 1/d * grad_phi  # Apply gradient update
+        # loss.backward()
+        # self.optimizer.step()
         self.phi = self.phi.detach().requires_grad_(True) # prevent old graph accumulation
 
     ## TODO: create run function separate from this class
@@ -166,15 +175,15 @@ class SVA:
                 else:
                     logger.info("No clusters to prune...")
                 
-                if self.phi.size(0) > 1:
-                    ## TODO: log some info about which clusters are being merged.
-                    logger.info("%d Clusters before merging...", self.K)
-                    self.w, self.phi, self.K = merge_and_prune(
-                        data[((idx+1)-self.prune_and_merge_freq):idx], self.w, self.phi, 
-                        self.rho, self.sigma, self.K,
-                        self.merge_cluster_distance_threshold
-                    )
-                    logger.info("%d Clusters remain after merge", self.K)
+                # if self.phi.size(0) > 1:
+                #     ## TODO: log some info about which clusters are being merged.
+                #     logger.info("%d Clusters before merging...", self.K)
+                #     self.w, self.phi, self.K = merge_and_prune(
+                #         data[((idx+1)-self.prune_and_merge_freq):idx], self.w, self.phi, 
+                #         self.rho, self.sigma, self.K,
+                #         self.merge_cluster_distance_threshold
+                #     )
+                #     logger.info("%d Clusters remain after merge", self.K)
 
-            self.incremental_fit(x)
+            self.incremental_fit(x, idx)
 
