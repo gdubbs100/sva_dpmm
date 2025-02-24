@@ -116,7 +116,7 @@ class SVA:
         mu0 = torch.zeros((2,))
         self.base_dist = dist.MultivariateNormal(mu0, 100*torch.diag(torch.ones(2,)))
     
-    def incremental_fit(self, x, idx, loss):
+    def incremental_fit(self, x, idx):
         new_phi = torch.nn.Parameter(self.base_dist.sample())
         _phi = torch.vstack((self.phi, new_phi))
         _w = torch.concat((self.w, self.alpha))
@@ -159,7 +159,7 @@ class SVA:
         self.phi = torch.nn.Parameter(data[0, ...].unsqueeze(0))
         logger.info("Initialising Phi: %s", self.phi.size())
         for idx, x in enumerate(data[1:, ...]):
-            self.incremental_fit(x, idx, loss)
+            self.incremental_fit(x, idx)
 
             if (idx + 1) % self.prune_and_merge_freq == 0:
                 
