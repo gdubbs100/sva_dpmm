@@ -141,7 +141,7 @@ class SVA:
         
         ## do the update
         d = np.min([1/self.lr_floor, (idx+1)**self.gamma])
-        loss += (
+        loss = (
             self.base_dist.log_prob(self.phi) +
             d * self.rho.detach() * (
                 dist.MultivariateNormal(self.phi, self.sigma).log_prob(x)
