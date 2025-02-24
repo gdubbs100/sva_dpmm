@@ -10,23 +10,27 @@ import utils.plotting as plotting
 from algorithms.sva import SVA
 
 dpmm = SVA(
-    learning_rate = 5.0e-2,
-    alpha = 1.0,
+    alpha = .5,
     gamma= 0.6,
     new_cluster_threshold= .99,
-    prune_and_merge_freq=200,
+    prune_and_merge_freq=1000,
     prune_cluster_threshold = 0.01,
-    merge_cluster_distance_threshold = .05
+    merge_cluster_distance_threshold = .1,
+    lr_floor = 0.01
 )
 
 ## sample data
 clusters = [
     dist.MultivariateNormal(
-        torch.tensor([20*torch.cos(torch.tensor(i*math.pi/16)), 20*torch.sin(torch.tensor(i*math.pi/5))]),
+        torch.tensor([
+            20*torch.cos(torch.tensor(i*math.pi/5)), 
+            20*torch.sin(torch.tensor(i*math.pi/5)), 
+            # 10*torch.sin(torch.tensor(i*math.pi/2))
+        ]),
         torch.diag(torch.ones(2,))
     ) for i in range(-5, 5)
 ]
-N = 300
+N = 500
 raw_data = torch.stack([
     d.sample(torch.tensor([N])) for d in clusters
 ]).reshape(-1, 2) 
