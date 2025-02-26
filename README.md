@@ -7,11 +7,11 @@ Project ideas may include:
 - Learn a DPMM policy (why?)
 
 ## TODO:
-[ ] Refactor `run` function to be separate from the `SVA` class
-[ ] Enable user to specify base distribution(s) and cluster distributions in `SVA` class. 
+- [ ] Refactor `run` function to be separate from the `SVA` class
+- [ ] Enable user to specify base distribution(s) and cluster distributions in `SVA` class. 
 - [ ] Specify which parameters to learn and which to hold constant (e.g. gaussian with fixed $\sigma$)
 
 ## Optional
-[ ] Add tensorboard logging??
-[ ] Train and test validation??
-[ ] Create `DataStream` class or something like it
+- [ ] Add tensorboard logging??
+- [ ] Train and test validation??
+- [ ] Create `DataStream` class or something like it
