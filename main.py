@@ -10,7 +10,7 @@ import utils.plotting as plotting
 from algorithms.sva import SVA
 
 dpmm = SVA(
-    alpha = .5,
+    alpha = 1,
     gamma= 0.6,
     new_cluster_threshold= .99,
     prune_and_merge_freq=1000,
@@ -42,9 +42,9 @@ if __name__ == "__main__":
     raw_data = raw_data[shuffdex,:]
     dpmm.run(raw_data)
 
-    phi = dpmm.phi
+    phi = dpmm.mixture_dist.parameters['loc']
     clusters = torch.argmax(
-        torch.exp(dist.MultivariateNormal(phi, dpmm.sigma).log_prob(raw_data.unsqueeze(1)) ), 
+        torch.exp(dpmm.mixture_dist.log_prob(raw_data.unsqueeze(1)) ), 
     axis=1)
 
     plotting.plot_clusters(

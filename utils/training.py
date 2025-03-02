@@ -3,12 +3,22 @@ import torch.distributions as dist
 from torch.nn.functional import l1_loss
 
 
-def calculate_rho(data, w, phi, sigma):
+# def calculate_rho(data, w, phi, sigma):
+#     ## TODO: figure out how to make this distribution more generic
+#     h=torch.vstack([dist.MultivariateNormal(_phi, sigma).log_prob(data) for _phi in phi])
+#     log_weights = torch.log(w) + h.T # Compute log of weights * likelihood
+#     log_rho = log_weights - torch.logsumexp(log_weights, dim=1, keepdim=True)  # Normalize
+#     return torch.exp(log_rho).squeeze()
+def calculate_rho(data, _w, mixture_dist):
     ## TODO: figure out how to make this distribution more generic
-    h=torch.vstack([dist.MultivariateNormal(_phi, sigma).log_prob(data) for _phi in phi])
-    log_weights = torch.log(w) + h.T # Compute log of weights * likelihood
-    log_rho = log_weights - torch.logsumexp(log_weights, dim=1, keepdim=True)  # Normalize
-    return torch.exp(log_rho).squeeze()
+    # h=torch.vstack([dist.MultivariateNormal(_phi, sigma).log_prob(data) for _phi in phi])
+    # breakpoint()
+    _h = mixture_dist.log_prob(data)
+    log_weights = torch.log(_w) + _h # Compute log of weights * likelihood
+
+    log_rho = log_weights - torch.logsumexp(log_weights, dim=0, keepdim=True)  # Normalize
+    # breakpoint()
+    return torch.exp(log_rho)#.squeeze()
 
 # 2. calculate cluster similarity
 def calculate_cluster_distance(rho, K):

@@ -1,7 +1,7 @@
 import pytest
 import torch
 import algorithms.sva
-from algorithms.sva import calculate_cluster_distance, prune
+from utils.training import calculate_cluster_distance, prune
 from utils.lr_scheduler import SVALRScheduler
 
 def test_calculate_cluster_distance():
