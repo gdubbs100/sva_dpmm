@@ -52,9 +52,8 @@ class SVA:
         self.rho = torch.tensor([1.])
         self.w = torch.tensor([1.])
 
-        self.sigma = torch.diag(torch.ones(2,))
-        # mu0 = torch.zeros((2,))
-        # self.base_dist = dist.MultivariateNormal(mu0, 100*torch.eye(2))
+        ## TODO: perhaps refactor to make base-dist an arg
+        ## create base dist
         mu0 = DistDPMMParam(
             name='loc', 
             value = dist.MultivariateNormal(torch.zeros(2,), 100*torch.eye(2))
@@ -106,6 +105,7 @@ class SVA:
 
     ## TODO: create run function separate from this class
     def run(self, data):
+        ## TODO: create options for passing mixture dist to run
         ## TODO: create options for initialising first cluster
         ## initialise cluster with first datapoint
         learnable_parameters = {'loc': True, 'covariance_matrix': False}
