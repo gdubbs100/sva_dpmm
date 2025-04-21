@@ -57,17 +57,15 @@ class MixtureDPMM:
         self.K = 1
 
     def log_prob(self, x):
-        # breakpoint()
         return self.mixture_dist(**self.parameters).log_prob(x)
 
     def add_parameters(self, new_params):
-        # breakpoint()
         for param_name, param_values in new_params.items():
             self.parameters[param_name] = torch.vstack(
                 (
                     self.parameters[param_name],
                     nn.Parameter(
-                        param_values,#.reshape(self.parameters[param_name].size(0), -1), 
+                        param_values, 
                         requires_grad=self.learnable_parameters[param_name]), 
                     )
             )
@@ -76,19 +74,32 @@ class MixtureDPMM:
     def remove_parameters(self, remove_mask):
         for param_name in self.parameters.keys():
             self.parameters[param_name] = self.parameters[param_name][~remove_mask]
-        self.K -= 1
+        ## TODO: this should reflect the number of removed params!!
+        self.K -= remove_mask.sum().item() 
     
     def remove_final_parameter(self):
         remove_mask = torch.tensor([(i+1)==self.K for i in range(self.K)])
         self.remove_parameters(remove_mask)
 
+    def merge_parameters(self, mapping: dict[int, int]):
+        ## TODO: consider updating aggregation function
+        for param_name in self.parameters.keys():
+            ## remove from compuatation graph
+            self.parameters[param_name] = self.parameters[param_name].detach() 
+            ## TODO: can you do this in a vectorized way?
+            for k, v in mapping.items():
+                # avg parameters to value (map key to value)
+                self.parameters[param_name][v] = 0.5*(
+                    self.parameters[param_name][k] + self.parameters[param_name][v]
+                )
+            ## reattach to graph
+            if self.learnable_parameters[param_name]:
+                self.parameters[param_name] = self.parameters[param_name].requires_grad_(True)
+
+
     def update_learnable_parameters(self, loss, lr):
         for param_name, is_learnable in self.learnable_parameters.items():
             if is_learnable:
-                # print(f"updating: {param_name}: {self.parameters[param_name]}")
                 grad = torch.autograd.grad(loss, self.parameters[param_name], retain_graph=True)[0]
                 self.parameters[param_name] = self.parameters[param_name] + lr * grad
                 self.parameters[param_name] = self.parameters[param_name].detach().requires_grad_(True)
-                # print(f"After update: {param_name}: {self.parameters[param_name]}")
-            # else:
-            #     print(f"not updating: {param_name}")

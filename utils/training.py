@@ -3,22 +3,14 @@ import torch.distributions as dist
 from torch.nn.functional import l1_loss
 
 
-# def calculate_rho(data, w, phi, sigma):
-#     ## TODO: figure out how to make this distribution more generic
-#     h=torch.vstack([dist.MultivariateNormal(_phi, sigma).log_prob(data) for _phi in phi])
-#     log_weights = torch.log(w) + h.T # Compute log of weights * likelihood
-#     log_rho = log_weights - torch.logsumexp(log_weights, dim=1, keepdim=True)  # Normalize
-#     return torch.exp(log_rho).squeeze()
 def calculate_rho(data, _w, mixture_dist):
-    ## TODO: figure out how to make this distribution more generic
-    # h=torch.vstack([dist.MultivariateNormal(_phi, sigma).log_prob(data) for _phi in phi])
-    # breakpoint()
-    _h = mixture_dist.log_prob(data)
+    ## unsqueeze at -2 lets first dim be interpreted as batch size
+    _h = mixture_dist.log_prob(data.unsqueeze(-2))
     log_weights = torch.log(_w) + _h # Compute log of weights * likelihood
 
-    log_rho = log_weights - torch.logsumexp(log_weights, dim=0, keepdim=True)  # Normalize
-    # breakpoint()
-    return torch.exp(log_rho)#.squeeze()
+    log_rho = log_weights - torch.logsumexp(log_weights, dim=-1, keepdim=True)  # Normalize
+
+    return torch.exp(log_rho)
 
 # 2. calculate cluster similarity
 def calculate_cluster_distance(rho, K):
@@ -40,7 +32,7 @@ def get_clusters_to_merge(cluster_distance_matrix, distance_threshold):
     return to_merge[order]
 
 # 4. calculate merge statistics
-def get_merge_statistics(clusters_to_merge, phi, rho, K):
+def get_merge_mapping(clusters_to_merge, K):
     merged = []
     all_to_prune = []
     merge_statistics = dict()
@@ -48,11 +40,8 @@ def get_merge_statistics(clusters_to_merge, phi, rho, K):
     for m in clusters_to_merge:
         if (m[0] not in merged) and (m[1] not in merged):
             all_to_prune.append(m[0].item()) # prune first idx
-            # use second idx as update
-            merge_statistics[m[1].item()] = {
-                'phi': (phi[m[0]] + phi[m[1]]) / 2,
-                'rho': rho[m[0]] + rho[m[1]]
-            }
+            # map first cluster to second
+            merge_statistics[m[0].item()] = m[1].item()
             merged.append(m[0])
             merged.append(m[1])
     
@@ -61,13 +50,19 @@ def get_merge_statistics(clusters_to_merge, phi, rho, K):
     return merge_statistics, all_to_prune
 
 ## apply merge, then apply prune
-def apply_merge(merge_statistics, phi, w):
-    phi = phi.detach() ## remove from computation graph temporarily
+def merge_and_prune_weights(merge_statistics, w):
+    mask = torch.zeros(w.size(0))!=0
+    ## merge
     for k, v in merge_statistics.items():
-        phi[k] = v['phi']
-        w[k] = v['rho']
-    phi = phi.requires_grad_(True) # reattach to graph
-    return phi, w
+        w[v] = w[k] + w[v]
+        mask[k] = True # don't prune value
+    ## prune
+    w = prune_weights(w, mask)
+    return w
+
+def prune_weights(w, mask):
+    w = w[~mask]
+    return w
 
 def prune(prune_idx: torch.Tensor, w: torch.Tensor, phi: torch.Tensor):
     w = w[~prune_idx]
@@ -75,11 +70,8 @@ def prune(prune_idx: torch.Tensor, w: torch.Tensor, phi: torch.Tensor):
     K = w.size(0)
     return w, phi, K
 
-def merge_and_prune(data, w, phi, rho, sigma, K, distance_threshold):
-    rho_prime = calculate_rho(data, w, phi, sigma)
-    cluster_distance_matrix = calculate_cluster_distance(rho_prime, K)
+def get_merge_statistics(data, w, mixture_dist, distance_threshold):
+    rho_prime = calculate_rho(data, w, mixture_dist)
+    cluster_distance_matrix = calculate_cluster_distance(rho_prime, mixture_dist.K)
     clusters_to_merge = get_clusters_to_merge(cluster_distance_matrix, distance_threshold)
-    merge_statistics, all_to_prune = get_merge_statistics(clusters_to_merge, phi, w, K)
-    phi, w = apply_merge(merge_statistics, phi, w)
-    w, phi, K = prune(all_to_prune, w, phi)
-    return w, phi, K
+    return get_merge_mapping(clusters_to_merge, mixture_dist.K)

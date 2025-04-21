@@ -11,9 +11,9 @@ from algorithms.sva import SVA
 
 dpmm = SVA(
     alpha = 1,
-    gamma= 0.6,
-    new_cluster_threshold= .99,
-    prune_and_merge_freq=1000,
+    gamma = 0.6,
+    new_cluster_threshold= .9,
+    prune_and_merge_freq=500,
     prune_cluster_threshold = 0.01,
     merge_cluster_distance_threshold = .1,
     lr_floor = 0.01
@@ -25,7 +25,6 @@ clusters = [
         torch.tensor([
             20*torch.cos(torch.tensor(i*math.pi/5)), 
             20*torch.sin(torch.tensor(i*math.pi/5)), 
-            # 10*torch.sin(torch.tensor(i*math.pi/2))
         ]),
         torch.diag(torch.ones(2,))
     ) for i in range(-5, 5)

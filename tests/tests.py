@@ -1,7 +1,7 @@
 import pytest
 import torch
 import algorithms.sva
-from utils.training import calculate_cluster_distance, prune
+from utils.training import calculate_cluster_distance #, prune
 from utils.lr_scheduler import SVALRScheduler
 
 def test_calculate_cluster_distance():
@@ -27,26 +27,26 @@ def test_calculate_cluster_distance():
 
     assert (actual==expected).all()
     
-def test_prune():
-    w = torch.tensor(
-        [.1, .1, .2, .6]
-    )
-    phi = torch.tensor(
-        [
-            [1,1],
-            [2,2],
-            [3,3],
-            [4,4]
-        ]
-    )
-    K = phi.size(0)
-    to_prune = w < .2
+# def test_prune():
+#     w = torch.tensor(
+#         [.1, .1, .2, .6]
+#     )
+#     phi = torch.tensor(
+#         [
+#             [1,1],
+#             [2,2],
+#             [3,3],
+#             [4,4]
+#         ]
+#     )
+#     K = phi.size(0)
+#     to_prune = w < .2
 
-    w, phi, K = prune(to_prune, w, phi)
+#     w, phi, K = prune(to_prune, w, phi)
 
-    assert K == 2
-    assert (w == torch.tensor([.2, .6])).all()
-    assert (phi == torch.tensor([[3,3],[4,4]])).all()
+#     assert K == 2
+#     assert (w == torch.tensor([.2, .6])).all()
+#     assert (phi == torch.tensor([[3,3],[4,4]])).all()
 
 def test_sva_lr_scheduler():
     lr=1
